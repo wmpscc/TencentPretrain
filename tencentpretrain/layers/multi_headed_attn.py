@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from tencentpretrain import mpu
 # from tencentpretrain.utils.rope import apply_rotary_emb
-from tencentpretrain.utils.hunyuan_rope_tp import apply_rotary_emb  # TODO: Need to modify when importing
+from tencentpretrain.utils.rope_rotate_half import apply_rotary_emb  # TODO: Need to modify when importing
 from tencentpretrain.utils.lora import LoraLinear
 
 
