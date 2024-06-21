@@ -67,8 +67,12 @@ class TransformerLayer(nn.Module):
         if len(inputs) == 2:
             hidden, mask = inputs
             prev_attn = None
+            position_ids = None
+        elif len(inputs) == 3:
+            hidden, mask, position_ids = inputs
+            prev_attn = None
         else:
-            hidden, mask, prev_attn = inputs
+            hidden, mask, prev_attn, position_ids = inputs
 
         _, seq_length, _ = hidden.size()
 
@@ -84,7 +88,7 @@ class TransformerLayer(nn.Module):
 
         if self.layernorm_positioning == "post":
             inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, position_ids=position_ids)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
@@ -92,16 +96,16 @@ class TransformerLayer(nn.Module):
         else:
             inter = self.layer_norm_1(hidden)
             inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, position_ids=position_ids)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
 
         if self.has_residual_attention:
-            return output, mask, prev_attn_out
+            return output, mask, prev_attn_out, position_ids
         else:
-            return output, mask
+            return output, mask, position_ids
 
 
 class ParallelTransformerLayer(nn.Module):
@@ -165,8 +169,11 @@ class ParallelTransformerLayer(nn.Module):
         if len(inputs) == 2:
             hidden, mask = inputs
             prev_attn = None
+        elif len(inputs) == 3:
+            hidden, mask, position_ids = inputs
+            prev_attn = None
         else:
-            hidden, mask, prev_attn = inputs
+            hidden, mask, prev_attn, position_ids = inputs
 
         _, seq_length, _ = hidden.size()
 
@@ -182,7 +189,7 @@ class ParallelTransformerLayer(nn.Module):
 
         if self.layernorm_positioning == "post":
             inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, position_ids=position_ids)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
@@ -190,16 +197,16 @@ class ParallelTransformerLayer(nn.Module):
         else:
             inter = self.layer_norm_1(hidden)
             inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, position_ids=position_ids)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
 
         if self.has_residual_attention:
-            return output, mask, prev_attn_out
+            return output, mask, prev_attn_out, position_ids
         else:
-            return output, mask
+            return output, mask, position_ids
 
 
 class ParallelTransformerLayerPipe(nn.Module):
@@ -233,10 +240,15 @@ class ParallelTransformerLayerPipe(nn.Module):
         """
 
         if len(inputs) == 2:
-            hidden, seg = inputs
+            hidden, mask = inputs
+            prev_attn = None
+            position_ids = None
+        elif len(inputs) == 3:
+            hidden, mask, position_ids = inputs
             prev_attn = None
         else:
-            hidden, seg, prev_attn = inputs
+            hidden, mask, prev_attn, position_ids = inputs
+
         batch_size, seq_length, _ = hidden.size()
         mask = self.generate_mask(seq_length, batch_size, hidden.device)
         layer_inputs = hidden, mask, prev_attn
@@ -251,9 +263,9 @@ class ParallelTransformerLayerPipe(nn.Module):
             hidden = self.layer_norm(hidden)
 
         if self.has_residual_attention:
-            return hidden, seg, prev_attn
+            return hidden, seg, prev_attn, position_ids
         else:
-            return hidden, seg
+            return hidden, seg, position_ids
 
 
 class TransformerDecoderLayer(nn.Module):

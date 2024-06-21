@@ -665,6 +665,18 @@ class LlmSftTrainer(LmTrainer):
     pass
 
 
+class QwenSftTrainer(LmTrainer):
+    # TODO: Need to change the name
+    def forward_propagation(self, batch, model):
+        src, tgt, seg, attention_mask, position_ids = batch
+        loss = model(src, tgt, seg, position_ids=position_ids, attention_mask=attention_mask)
+
+        self.total_loss += loss.cpu().item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+
+
 str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "albert": AlbertTrainer, "bilm": BilmTrainer, "cls": ClsTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,

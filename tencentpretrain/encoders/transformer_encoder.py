@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from tencentpretrain.utils.rope import precompute_freqs_cis
+# from tencentpretrain.utils.rope import precompute_freqs_cis
+from tencentpretrain.utils.rope_rotate_half import precompute_freqs_cis  # TODO: Need to modify when importing
 from tencentpretrain.layers.transformer import TransformerLayer, ParallelTransformerLayer
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
 from tencentpretrain.layers import *
@@ -66,7 +67,7 @@ class TransformerEncoder(nn.Module):
             self.freqs_cis = precompute_freqs_cis(args.hidden_size // args.heads_num, args.max_seq_length * 2)
 
 
-    def forward(self, emb, seg):
+    def forward(self, emb, seg, position_ids=None, attention_mask=None):
         """
         Args:
             emb: [batch_size x seq_length x emb_size]
@@ -80,38 +81,44 @@ class TransformerEncoder(nn.Module):
         batch_size, seq_length, _ = emb.size()
         # Generate mask according to segment indicators.
         # mask: [batch_size x 1 x seq_length x seq_length]
-        if self.mask == "fully_visible":
-            mask = (seg > 0). \
-                unsqueeze(1). \
-                repeat(1, seq_length, 1). \
-                unsqueeze(1)
-            mask = mask.float()
-            mask = (1.0 - mask) * -10000.0
-        elif self.mask == "causal":
-            mask = torch.ones(seq_length, seq_length, device=emb.device)
-            mask = torch.tril(mask)
-            mask = (1.0 - mask) * -10000
-            mask = mask.repeat(batch_size, 1, 1, 1)
+        if attention_mask is not None:
+            mask = (1.0 - attention_mask) * -10000.0
         else:
-            mask_a = (seg == 1). \
-                unsqueeze(1). \
-                repeat(1, seq_length, 1). \
-                unsqueeze(1).float()
+            if self.mask == "fully_visible":
+                mask = (seg > 0). \
+                    unsqueeze(1). \
+                    repeat(1, seq_length, 1). \
+                    unsqueeze(1)
+                mask = mask.float()
+                mask = (1.0 - mask) * -10000.0
+            elif self.mask == "causal":
+                mask = torch.ones(seq_length, seq_length, device=emb.device)
+                mask = torch.tril(mask)
+                mask = (1.0 - mask) * -10000
+                mask = mask.repeat(batch_size, 1, 1, 1)
+            else:
+                mask_a = (seg == 1). \
+                    unsqueeze(1). \
+                    repeat(1, seq_length, 1). \
+                    unsqueeze(1).float()
 
-            mask_b = (seg > 0). \
-                unsqueeze(1). \
-                repeat(1, seq_length, 1). \
-                unsqueeze(1).float()
+                mask_b = (seg > 0). \
+                    unsqueeze(1). \
+                    repeat(1, seq_length, 1). \
+                    unsqueeze(1).float()
 
-            mask_tril = torch.ones(seq_length, seq_length, device=emb.device)
-            mask_tril = torch.tril(mask_tril)
-            mask_tril = mask_tril.repeat(batch_size, 1, 1, 1)
+                mask_tril = torch.ones(seq_length, seq_length, device=emb.device)
+                mask_tril = torch.tril(mask_tril)
+                mask_tril = mask_tril.repeat(batch_size, 1, 1, 1)
 
-            mask = (mask_a + mask_b + mask_tril >= 2).float()
-            mask = (1.0 - mask) * -10000.0
+                mask = (mask_a + mask_b + mask_tril >= 2).float()
+                mask = (1.0 - mask) * -10000.0
 
         hidden = emb
-        inputs = hidden, mask
+        if position_ids:
+            inputs = hidden, mask, position_ids
+        else:
+            inputs = hidden, mask
 
         if self.deepspeed_checkpoint_activations:
             from deepspeed import checkpointing

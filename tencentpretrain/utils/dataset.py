@@ -1109,3 +1109,84 @@ class LlmSftDataset(Dataset):
 
         dataset_writer.close()
         return samples_num, tokens_num
+
+class QwenSftMergeSampleDataset(Dataset):
+    def __init__(self, args, vocab, tokenizer):
+        super().__init__(args, vocab, tokenizer)
+        self.prefix_space = args.prefix_space if hasattr(args, "prefix_space") else False
+        self.full_sentences = args.full_sentences
+
+    def build_and_save(self, workers_num):
+        log_interval = 100
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            pool = Pool(workers_num)
+            encoded_docs = pool.imap(self.encode, f, 1000)
+
+            with open(self.dataset_path, "wb") as dataset_writer:
+                last_src = deque()
+                last_seg_pos = deque()
+                packing_num = 0
+                sample_num = 0
+                for idx, data in enumerate(encoded_docs):
+                    if data is None:
+                        continue
+                    if self.full_sentences:
+                        src = data[0][0]
+                        if len(last_src) + len(src) > self.seq_length:
+                            pad_num = self.seq_length - len(last_src)
+                            # print(pad_num, self.seq_length, len(last_src), list(last_seg_pos))
+                            pickle.dump(((list(last_src), pad_num), list(last_seg_pos)), dataset_writer)
+                            sample_num += 1
+
+                            last_src.clear()
+                            last_seg_pos.clear()
+                            last_src.extend(src)
+                            last_seg_pos.append((data[1][0], data[1][1]))
+                        else:
+                            last_src.extend(src)
+                            last_end = last_seg_pos[-1][1] if len(last_seg_pos) > 0 else 0
+                            last_seg_pos.append((data[1][0] + last_end, data[1][1] + last_end))
+
+                    else:
+                        pickle.dump([data], dataset_writer)
+                        sample_num += 1
+
+                    packing_num += 1
+                    if idx % log_interval == 0:
+                        print(f"Processed {packing_num} packing documents", file=sys.stderr)
+                        print(f"Number of sample: {sample_num}", file=sys.stderr)
+
+    def encode(self, line):
+        data = json.loads(line)
+
+        instruction = data.get("instruction", "").replace('\\n', '\n')
+        input = data.get("input", "").replace('\\n', '\n')
+        output = data.get("output", "").replace('\\n', '\n')
+
+        if self.prefix_space:
+            prompt = " " + instruction + input
+        else:
+            prompt = instruction + input
+        document_input = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt))
+        document_output = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(output))
+
+        src = document_input + [self.vocab.get(SEP_TOKEN)]
+        seg_pos = [len(src)]
+        if len(src) > self.seq_length:
+            return None
+        src.extend(document_output)
+        src.append(self.vocab.get(EOD_TOKEN))
+        if len(src) > self.seq_length:
+            src = src[:self.seq_length - 1]
+            src.append(self.vocab.get(EOD_TOKEN))
+        seg_pos.append(len(src))
+
+        pad_num = 0
+        if len(src) <= self.seq_length:
+            pad_num = self.seq_length - len(src)
+
+        return ((src, pad_num), seg_pos)
+
+    def worker(self, proc_id, start, end):
+        pass
+

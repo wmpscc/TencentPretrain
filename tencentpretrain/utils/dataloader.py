@@ -9,7 +9,8 @@ from tencentpretrain.utils.augment import SpecAugment
 
 
 class Dataloader(object):
-    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False, model_for_dataloader=None):
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
         self.tokenizer = args.tokenizer
         self.batch_size = batch_size
         self.instances_buffer_size = args.instances_buffer_size
@@ -86,7 +87,8 @@ class BertDataloader(Dataloader):
                     is_next.append(ins[2])
                     seg.append([1] * ins[3][0] + [2] * (ins[3][1] - ins[3][0]) + [0] * pad_num)
                 else:
-                    src_single, tgt_mlm_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                    src_single, tgt_mlm_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking,
+                                                          self.span_masking, self.span_geo_prob, self.span_max_length)
                     masked_words_num += len(tgt_mlm_single)
                     src.append(src_single)
                     tgt_mlm.append([0] * len(src_single))
@@ -134,7 +136,8 @@ class MlmDataloader(Dataloader):
                         tgt[-1][mask[0]] = mask[1]
                     seg.append([1] * ins[2][0] + [0] * pad_num)
                 else:
-                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking,
+                                                      self.span_masking, self.span_geo_prob, self.span_max_length)
                     masked_words_num += len(tgt_single)
                     src.append(src_single)
                     tgt.append([0] * len(src_single))
@@ -179,10 +182,10 @@ class LmDataloader(Dataloader):
                 src.append(src_single[:-1])
                 tgt.append(src_single[1:])
                 seg.append([1] * ins[1][0] + [0] * (len(src_single) - 1 - ins[1][0]))
-            
+
             if self.pipeline_model_parallel_size > 1:
-                yield (torch.LongTensor(src),torch.LongTensor(seg)), \
-                    (torch.LongTensor(tgt),torch.LongTensor(seg))
+                yield (torch.LongTensor(src), torch.LongTensor(seg)), \
+                    (torch.LongTensor(tgt), torch.LongTensor(seg))
             else:
                 yield torch.LongTensor(src), \
                     torch.LongTensor(tgt), \
@@ -289,7 +292,8 @@ class T5Dataloader(Dataloader):
                     tgt_single = ins[1]
                     seg.append([1] * ins[2][0] + [0] * pad_num)
                 else:
-                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking,
+                                                      self.span_masking, self.span_geo_prob, self.span_max_length)
                     seg.append([1] * ins[1][0] + [0] * pad_num)
 
                 MASK_ID = self.vocab.get(MASK_TOKEN)
@@ -381,7 +385,6 @@ class BartDataloader(Dataloader):
                 pad_num = max(ins[1][1] - 1, 0)  # left shifted, pad_num >= 0
                 tgt_seg.append([1] * (len(tgt_in[-1]) - pad_num) + [0] * pad_num)
 
-
                 MASK_ID = self.vocab.get(MASK_TOKEN)
 
                 src_with_span_mask = []
@@ -399,7 +402,6 @@ class BartDataloader(Dataloader):
 
                 seg.append([1] * seg_pos + [0] * (len(src_single) - seg_pos))
                 src.append(src_with_span_mask)
-
 
             yield torch.LongTensor(src), \
                 torch.LongTensor(tgt_out), \
@@ -432,10 +434,10 @@ class ClsDataloader(Dataloader):
                     seg_single = [1] * seg_pos_single[0]
                 elif len(seg_pos_single) == 2:
                     seg_single = [1] * seg_pos_single[0] + [2] * seg_pos_single[1]
-                
+
                 src_single += [self.vocab.get(PAD_TOKEN)] * pad_num
                 seg_single += [0] * pad_num
-                
+
                 src.append(src_single)
                 tgt.append(ins[1])
                 seg.append(seg_single)
@@ -503,19 +505,20 @@ class ClsMlmDataloader(Dataloader):
                     seg_single = [1] * seg_pos_single[0]
                 elif len(seg_pos_single) == 2:
                     seg_single = [1] * seg_pos_single[0] + [2] * seg_pos_single[1]
-                
+
                 src_single += [self.vocab.get(PAD_TOKEN)] * pad_num
                 seg_single += [0] * pad_num
                 seg.append(seg_single)
 
-                if len(ins) == 4 :
+                if len(ins) == 4:
                     src.append(src_single)
                     masked_words_num += len(ins[1])
                     tgt_mlm.append([0] * len(src_single))
                     for mask in ins[1]:
                         tgt_mlm[-1][mask[0]] = mask[1]
                 else:
-                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                    src_single, tgt_single = mask_seq(src_single, self.tokenizer, self.whole_word_masking,
+                                                      self.span_masking, self.span_geo_prob, self.span_max_length)
                     src.append(src_single)
                     masked_words_num += len(tgt_single)
                     tgt_mlm.append([0] * len(src_single))
@@ -532,8 +535,10 @@ class ClsMlmDataloader(Dataloader):
 
 
 class VisionDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False, model_for_dataloader=None):
-        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
+        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank,
+                                               shuffle, model_for_dataloader)
         self.patch_size = args.patch_size
         self.image_height = args.image_height
         self.image_width = args.image_width
@@ -549,7 +554,8 @@ class VisionDataloader(Dataloader):
         preprocess_pipeline.append(transforms.Resize((self.image_height, self.image_width)))
         preprocess_pipeline.append(ZeroOneNormalize())
         if "normalize" in args.image_preprocess:
-            preprocess_pipeline.append(transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
+            preprocess_pipeline.append(
+                transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
         self.transform = transforms.Compose(preprocess_pipeline)
 
 
@@ -582,7 +588,6 @@ class VitDataloader(VisionDataloader):
             seg = []
 
             for ins in instances:
-
                 image = read_image(ins[1], ImageReadMode.RGB)
                 image = image.cuda(self.local_rank)
                 src.append(self.transform(image))
@@ -590,8 +595,8 @@ class VitDataloader(VisionDataloader):
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
             yield torch.stack(src, 0), \
-                  torch.LongTensor(tgt), \
-                  torch.LongTensor(seg)
+                torch.LongTensor(tgt), \
+                torch.LongTensor(seg)
 
 
 class ViltDataloader(VisionDataloader):
@@ -632,7 +637,8 @@ class ViltDataloader(VisionDataloader):
             for ins in instances:
                 src_text_single, pad_num = ins[0]
                 src_text_single += [self.vocab.get(PAD_TOKEN)] * pad_num
-                src_text_single, tgt_mlm_single = mask_seq(src_text_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                src_text_single, tgt_mlm_single = mask_seq(src_text_single, self.tokenizer, self.whole_word_masking,
+                                                           self.span_masking, self.span_geo_prob, self.span_max_length)
                 src_text.append(src_text_single)
                 masked_words_num += len(tgt_mlm_single)
                 tgt_mlm.append([0] * len(src_text_single))
@@ -657,10 +663,10 @@ class ViltDataloader(VisionDataloader):
                 continue
 
             yield torch.LongTensor(src_text), \
-                  torch.stack(src_image, 0), \
-                  torch.LongTensor(tgt_mlm), \
-                  torch.LongTensor(tgt_match), \
-                  torch.LongTensor(seg)
+                torch.stack(src_image, 0), \
+                torch.LongTensor(tgt_mlm), \
+                torch.LongTensor(tgt_match), \
+                torch.LongTensor(seg)
 
 
 class ClipDataloader(VisionDataloader):
@@ -703,17 +709,20 @@ class ClipDataloader(VisionDataloader):
                 image = read_image(ins[2], ImageReadMode.RGB)
                 image = image.cuda(self.local_rank)
                 src_image.append(self.transform(image))
-                seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
+                seg_image.append(
+                    [1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
-            yield  torch.LongTensor(src_text), \
-                   torch.stack(src_image, 0), \
-                   torch.LongTensor(seg_text), \
-                   torch.LongTensor(seg_image)
+            yield torch.LongTensor(src_text), \
+                torch.stack(src_image, 0), \
+                torch.LongTensor(seg_text), \
+                torch.LongTensor(seg_image)
 
 
 class AudioDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False, model_for_dataloader=None):
-        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
+        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank,
+                                              shuffle, model_for_dataloader)
         self.dataset_folder = os.path.dirname(dataset_path)
         self.sampling_rate = args.sampling_rate
         self.normalize_means, self.normalize_vars, self.ceptral_normalize = True, True, True
@@ -731,6 +740,7 @@ class AudioDataloader(Dataloader):
             self.ceptral_normalize = False
         if "specaugment" in args:
             self.specaugment = SpecAugment(args)
+
 
 def utterance_cmvn(x, normalize_means=True, normalize_vars=True, local_rank=None):
     mean = x.mean(axis=0)
@@ -754,7 +764,9 @@ class S2tDataloader(AudioDataloader):
     def __iter__(self):
         import torchaudio
         import torchaudio.compliance.kaldi as ta_kaldi
-        padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(self.local_rank)
+        padding_vector = torch.FloatTensor(self.audio_feature_size * [
+            self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(
+            self.local_rank)
         while True:
             while self._empty():
                 self._fill_buf()
@@ -790,10 +802,11 @@ class S2tDataloader(AudioDataloader):
                 else:
                     src_audio.append(torch.cat([feature] + [padding_vector] * difference))
 
-                src_pad_num = int(self.max_audio_frames / self.conv_layers_num / 2) - int(feature.size(0) / self.conv_layers_num / 2)
+                src_pad_num = int(self.max_audio_frames / self.conv_layers_num / 2) - int(
+                    feature.size(0) / self.conv_layers_num / 2)
                 seg_audio.append([1] * int(feature.size(0) / self.conv_layers_num / 2) + [0] * src_pad_num)
                 tgt_out.append(text_single[1:])
-                text_single[-pad_num-1] = self.vocab.get(PAD_TOKEN)
+                text_single[-pad_num - 1] = self.vocab.get(PAD_TOKEN)
 
                 tgt_in.append(text_single[:-1])
                 pad_num = max(pad_num - 1, 0)  # left shifted, pad_num >= 0
@@ -802,29 +815,29 @@ class S2tDataloader(AudioDataloader):
             if len(src_audio) == 0:
                 continue
 
-            yield  torch.stack(src_audio, 0), \
-                   torch.LongTensor(tgt_out), \
-                   torch.LongTensor(seg_audio), \
-                   torch.LongTensor(tgt_in), \
-                   torch.LongTensor(tgt_seg)
+            yield torch.stack(src_audio, 0), \
+                torch.LongTensor(tgt_out), \
+                torch.LongTensor(seg_audio), \
+                torch.LongTensor(tgt_in), \
+                torch.LongTensor(tgt_seg)
 
 
 class BeitDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False, model_for_dataloader=None):
-        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
+        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank,
+                                             shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
         self.vqgan = self.model_for_dataloader
 
-
-    def mask(self, image_tokens, mask_rate = 0.15):
+    def mask(self, image_tokens, mask_rate=0.15):
         mask_num = int(len(image_tokens) * mask_rate)
         mask_index = random.sample(range(1, len(image_tokens)), mask_num)
         tgt = [0] * len(image_tokens)
         for idx in mask_index:
             tgt[idx] = image_tokens[idx]
         return tgt, mask_index
-
 
     def __iter__(self):
         """
@@ -856,7 +869,6 @@ class BeitDataloader(VisionDataloader):
             seg = []
             mask = []
             for ins in instances:
-
                 image = read_image(ins, ImageReadMode.RGB)
                 image = image.cuda(self.local_rank)
                 image = self.transform(image)
@@ -868,19 +880,20 @@ class BeitDataloader(VisionDataloader):
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
             yield torch.stack(src, 0), \
-                  torch.LongTensor(tgt), \
-                  torch.LongTensor(seg), \
-                  mask
+                torch.LongTensor(tgt), \
+                torch.LongTensor(seg), \
+                mask
 
 
 class DalleDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False, model_for_dataloader=None):
-        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
+        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank,
+                                              shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
         self.vqgan = self.model_for_dataloader
         self.vocab_bias = args.tokenizer.vocab_bias
-
 
     def __iter__(self):
         from torchvision.io import read_image
@@ -915,8 +928,8 @@ class DalleDataloader(VisionDataloader):
                 seg.append(seg_single)
 
             yield torch.LongTensor(src), \
-                  torch.LongTensor(tgt), \
-                  torch.LongTensor(seg)
+                torch.LongTensor(tgt), \
+                torch.LongTensor(seg)
 
 
 class LlmSftDataloader(Dataloader):
@@ -946,9 +959,96 @@ class LlmSftDataloader(Dataloader):
                     seg.append([2] * (ins[1][1] - 1) + [0] * pad_num)
 
             yield torch.LongTensor(src), \
-                  torch.LongTensor(tgt), \
-                  torch.LongTensor(seg)
+                torch.LongTensor(tgt), \
+                torch.LongTensor(seg)
 
 
 class LlmPretrainDataloader(LmDataloader):
     pass
+
+
+class QwenSftMergeSampleDataloader(Dataloader):
+    # TODO: Inherit pytorch dataloader implementation.
+    def __init__(self, args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle=False,
+                 model_for_dataloader=None):
+        super().__init__(args, dataset_path, batch_size, global_rank, world_size, local_rank, shuffle,
+                         model_for_dataloader)
+        self.seq_length = args.seq_length
+        self.reset_position_ids = args.reset_position_ids
+        self.reset_attention_mask = args.reset_attention_mask
+
+    def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
+        while True:
+            while self._empty():
+                self._fill_buf()
+            if self.start + self.batch_size >= self.end:
+                instances = self.buffer[self.start:]
+            else:
+                instances = self.buffer[self.start: self.start + self.batch_size]
+
+            self.start += self.batch_size
+
+            batch_size = len(instances)
+
+            src = []
+            tgt = []
+            seg = []
+
+            for ins in instances:
+                # ((src, pad_num), seg_pos)
+                src_single, pad_num = ins[0]
+                src_single.extend([self.vocab.get(PAD_TOKEN)] * pad_num)
+                src_single.append(src_single[0])  # 尾部补上第一个token，使得序列长度等于seq+1
+                src.append(src_single[:-1])
+                tgt.append(src_single[1:])
+
+                tmp_seg = []
+                last_end = 0
+                for idx, sample_seg_pos in enumerate(ins[1]):
+                    tmp_seg.extend([1] * (sample_seg_pos[0] - last_end) + [2] * (sample_seg_pos[1] - sample_seg_pos[0]))
+                    last_end = sample_seg_pos[1]
+                tmp_seg.extend([0] * pad_num)
+                tmp_seg.append(0)  # 屏蔽最后一个位置
+                seg.append(tmp_seg[1:])
+
+            src = torch.LongTensor(src)
+            tgt = torch.LongTensor(tgt)
+            seg = torch.LongTensor(seg)
+
+            attention_mask = torch.tril(torch.ones(
+                (batch_size, self.seq_length, self.seq_length))).view(
+                batch_size, 1, self.seq_length, self.seq_length)
+            position_ids = torch.arange(self.seq_length, dtype=torch.long)
+            position_ids = position_ids.unsqueeze(0).expand_as(src)
+
+            # We need to clone as the ids will be modifed based on batch index.
+            if self.reset_position_ids:
+                position_ids = position_ids.clone()
+
+            if self.reset_position_ids or self.reset_attention_mask:
+                # Loop through the batches:
+                for b in range(batch_size):
+                    # Find indecies where EOD token is.
+                    eod_index = position_ids[b, src[b] == self.vocab.get(EOD_TOKEN)]
+                    # Detach indecies from positions if going to modify positions.
+                    if self.reset_position_ids:
+                        eod_index = eod_index.clone()
+                    eod_index = sorted(eod_index)
+
+                    # Loop through EOD indecies:
+                    prev_index = 0
+                    for idx in eod_index:
+                        # i = eod_index[j]
+                        # Mask attention loss.
+                        if self.reset_attention_mask:
+                            attention_mask[b, 0, (idx + 1):, :(idx + 1)] = 0
+                        # Reset positions.
+                        if self.reset_position_ids:
+                            position_ids[b, (idx + 1):] -= (idx + 1 - prev_index)
+                            prev_index = idx + 1
+
+            # Convert attention mask to binary:
+            attention_mask = (attention_mask > 0.5).long()
+
+            yield src, tgt, seg, attention_mask, position_ids

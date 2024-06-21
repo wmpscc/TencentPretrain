@@ -2,7 +2,8 @@ import math
 import torch
 import torch.nn as nn
 from tencentpretrain import mpu
-from tencentpretrain.utils.rope import apply_rotary_emb
+# from tencentpretrain.utils.rope import apply_rotary_emb
+from tencentpretrain.utils.hunyuan_rope_tp import apply_rotary_emb  # TODO: Need to modify when importing
 from tencentpretrain.utils.lora import LoraLinear
 
 
@@ -66,7 +67,7 @@ class MultiHeadedAttention(nn.Module):
             self.layer_number = None
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
-                freqs_cis=None, alibi=None):
+                freqs_cis=None, alibi=None, position_ids=None):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -105,7 +106,9 @@ class MultiHeadedAttention(nn.Module):
 
 
         if freqs_cis is not None:
-            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+            # query, key = apply_rotary_emb(query.transpose(1, 2), key.transpose(1, 2), freqs_cis=freqs_cis)
+            # TODO: Need to be compatible with older versions
+            query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis, position_ids=position_ids)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
 

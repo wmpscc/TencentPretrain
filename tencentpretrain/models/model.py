@@ -29,9 +29,9 @@ class Model(nn.Module):
         if self.decoder is not None and args.share_embedding:
             self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
 
-    def forward(self, src, tgt, seg, tgt_in=None, tgt_seg=None):
+    def forward(self, src, tgt, seg, tgt_in=None, tgt_seg=None, position_ids=None, attention_mask=None):
         emb = self.embedding(src, seg)
-        memory_bank = self.encoder(emb, seg)
+        memory_bank = self.encoder(emb, seg, position_ids, attention_mask)
         if self.decoder:
             tgt_emb = self.tgt_embedding(tgt_in, tgt_seg)
             memory_bank = self.decoder(memory_bank, tgt_emb, (seg, tgt_seg))
